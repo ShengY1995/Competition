@@ -1,0 +1,203 @@
+---
+title: "Competition-2"
+author: "Sheng-Yu Wei"
+date: "3/16/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(tidyr)
+library(partykit)
+library(caret)
+library(ggplot2)
+library(lattice)
+library(skimr)
+```
+## Input training data
+```{r}
+# Input the competition-data.csv to train our model
+df <- read.csv("competition-data.csv")
+```
+
+```{r}
+# Separate the predictors (df_x) and outcome (df_y)
+df_x <- df %>%
+  select(-outcome)
+
+df_y <- df$outcome
+```
+
+
+## Explore the dataset
+
+```{r}
+# Distribution of the outcome
+ggplot(df, aes(x = outcome)) +
+  geom_histogram(bins = 10, color="black", fill="grey")
+```
+
+```{r}
+skim(df)
+```
+
+## All variables histogram
+```{r}
+df_x %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(bins = 20)
+df_x %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_boxplot(outlier.shape = NA)
+```
+
+## feature plot
+
+```{r}
+feature_plot_df <- df_x %>%
+  mutate(outcome = df$outcome) %>%
+  pivot_longer(cols=colnames(df_x))
+```
+```{r}
+feature_plots <- ggplot(feature_plot_df, aes(x=value, y=outcome)) + 
+  geom_point(alpha=0.3, size=0.4) + 
+  facet_wrap( ~ name, scales="free") +
+  labs(y = "Response of defaulting")+
+  theme(text = element_text(size = 8))
+feature_plots
+```
+
+## Some interesting finds
+
+1. The outcome is between 0 to 100, but all the values are integer -> Is it possible that these values are "categorical" instead of numeric?
+2. Most of the predictors contain tremendous 0 value (X11, X12, X13 ...), it doesn't seem like a normal "skewed" issue -> I suggest it must be some errors or manual adjustment (normally, distribution will not be that extreme)
+3. X19, X20, X21 have very interesting property which directly influence the outcome -> They all exist a "threshold" (we will talk about this later), each variables beyond or under this threshold will lead outcome to 0 (as image below).
+
+```{r fig.width=15, fig.height=4}
+# Threshold for X19
+ggplot(df, aes(x = X19, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 50, color = "blue") +
+  annotate(geom="text", x=150, y=50, label="X19 = 50",
+              color="blue")+
+  theme_classic()
+
+# Threshold for X20
+ggplot(df, aes(x = X20, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 100, color = "blue") +
+  annotate(geom="text", x=550, y=25, label="X20 = 100",
+              color="blue")+
+  theme_classic()
+
+# Threshold for X21
+ggplot(df, aes(x = X21, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 50000, color = "blue") +
+  annotate(geom="text", x=180000, y=25, label="X20 = 180000",
+              color="blue")+
+  theme_classic()
+```
+
+
+## Preprocess (feature engineering)
+
+* We are going to use the property that we mentioned above at point 3 and apply some feature engineering
+
+```{r}
+# figure out the existing of threshold which cause the outcome = 0
+# we calculate the number of rows which satisfy both of the conditions: (X >= or <= "threshold") and (outcome = 0)
+# we divide above result by number of rows that outcome = 0
+# we get the percentage of how that predictor influence the outcome
+
+x19_p <- nrow(filter(df, (df$X19 >= 50) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+x20_p <- nrow(filter(df, (df$X20 <= 100) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+x21_p <- nrow(filter(df, (df$X21 <= 1000) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+c(x19_p,x20_p,x21_p)
+```
+* The result shows that 3 predictors lead to 100% of the 0 outcome
+
+* Base on the above statement, we `mutate` 3 categorical-like predictors to our df_x
+```{r}
+# preprocess 1 (adding additional X19_2, X20_2, X21_2 as "categorical" variables, which 0 represents smaller than threshold, and 1 represents larger)
+df_x_1 <- df_x %>%
+  mutate(X19_2 = ifelse(df_x$X19 < 50, 0, 1), 
+         X20_2 = ifelse(df_x$X20 < 100, 0, 1), 
+         X21_2 = ifelse(df_x$X21 < 1000, 0, 1))
+# and we get our preprocessed x data
+```
+
+
+## CV
+
+**Set up cross validation**
+```{r}
+# Use fold = 4 in order to estimate the real generalization RMSE (since we use 6k training data to predict 2k test-x-values = 3:1)
+set.seed(1)
+folds <- createFolds(df_new_y, k = 4, returnTrain = TRUE)
+ctrl <- trainControl(method = "cv", index = folds)
+```
+
+```{r}
+# Use fold = 10 in order to estimate the ideal generalization RMSE (we probably might not get this good)
+set.seed(1)
+folds2 <- createFolds(df_new_y, k = 10, returnTrain = TRUE)
+ctrl2 <- trainControl(method = "cv", index = folds2)
+```
+
+# Model training
+
+# Output the prediction as CSV format 
+
+```{r}
+# Output a csv file with our prediction
+df_test <- read.csv("competition-test-x-values.csv") %>%
+  mutate(X19_2 = ifelse(df_test$X19 < 50, 0, 1), 
+         X20_2 = ifelse(df_test$X20 < 100, 0, 1), 
+         X21_2 = ifelse(df_test$X21 < 1000, 0, 1))
+
+result <- as.data.frame(predict("TBD", df_test))
+
+csv_write <- write.table(result,
+                         file = "competition-test-outcome.csv",
+                         row.names = FALSE,
+                         col.names = "outcome")
+csv_write
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
