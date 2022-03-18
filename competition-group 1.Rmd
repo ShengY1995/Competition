@@ -158,6 +158,60 @@ ctrl2 <- trainControl(method = "cv", index = folds2)
 
 # Model training
 
+## Random forests
+
+```{r}
+mtryGrid <- data.frame(
+  mtry = floor(seq(10, 20, length = 11))
+  )
+```
+
+```{r}
+set.seed(2)
+
+# Comparison group : No preprocess applied
+rfTune_comp <- train(x = df_x, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                importance = TRUE,
+                trControl = ctrl)
+
+# Test group1 : Preprocess applied, cv fold = 3
+rfTune_test1 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl)
+
+# Test group2 : Preprocess applied, cv fold = 10
+rfTune_test2 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl2)
+```
+
+```{r}
+# Plot the result and comparison
+ggplot(rfTune_comp, aes(x = mtry, y = RMSE)) +
+  geom_point(data = rfTune_test$results)+
+  geom_line(data = rfTune_test$results, color = "blue")+
+  geom_point(data = rfTune_test2$results)+
+  geom_line(data = rfTune_test2$results, color = "green")+
+  annotate(geom="text", x=15, y=2.515, label="test1",
+              color="blue")+
+  annotate(geom="text", x=15, y=2.49, label="test2",
+              color="green")+
+  annotate(geom="text", x=15, y=2.56, label="comparison")+
+  theme_classic()
+```
+
+
 # Output the prediction as CSV format 
 
 ```{r}
