@@ -1,0 +1,39 @@
+---
+title: "Competiton"
+author: "Christian Lewandowski"
+date: "3/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(caret)
+library(modelr)
+library(ggplot2)
+library(lattice)
+library(scatterplot3d)
+library(partykit) # For plotting basic regression trees
+library(AppliedPredictiveModeling)
+library(inum)
+library(RWekajars)
+library(pls)
+library(elasticnet)
+library(corrplot)
+library(earth)
+```
+
+
+```{r}
+setwd("~/Downloads")
+comp_data <- read.csv("competition-data.csv")
+```
+
+
+
+
+
+
