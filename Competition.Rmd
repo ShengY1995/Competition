@@ -33,6 +33,32 @@ comp_data <- read.csv("competition-data.csv")
 ```
 
 
+# Regression tree
+```{r}
+set.seed(1)
+cartTune <- train(x = df_x_1, y = df_y,
+method = "rpart",
+tuneLength = 15,
+trControl = ctrl)
+plot(cartTune)
+```
+
+
+
+# MARS
+```{r}
+set.seed(1)
+marsGrid <- expand.grid(degree = 1:4, nprune = c(10, 20, 30, 40))
+marsTune <- train(df_x_1, df_y,
+method = "earth",
+tuneGrid = marsGrid,
+preProcess = c("center", "scale"),
+trControl = ctrl
+)
+ggplot(marsTune)+
+theme_classic()
+```
+
 
 
 
