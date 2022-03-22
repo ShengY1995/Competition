@@ -91,7 +91,7 @@ feature_plots
 
 1. The outcome is between 0 to 100, but all the values are integer -> Is it possible that these values are "categorical" instead of numeric?
 2. Most of the predictors contain tremendous 0 value (X11, X12, X13 ...), it doesn't seem like a normal "skewed" issue -> I suggest it must be some errors or manual adjustment (normally, distribution will not be that extreme)
-3. X19, X20, X21 have very interesting property which directly influence the outcome -> They all exist a "threshold" (we will talk about this later), each variables beyond or under this threshold will lead outcome to 0 (as image below).
+3. X19, X20, X21  directly influences the outcome -> A "threshold" exists (we will talk about this later), each variables beyond or under this threshold will lead outcome to a 0 (as image below).
 
 ```{r fig.width=15, fig.height=4}
 # Threshold for X19
@@ -122,12 +122,12 @@ ggplot(df, aes(x = X21, y = outcome)) +
 
 ## Preprocess (feature engineering)
 
-* We are going to use the property that we mentioned above at point 3 and apply some feature engineering
+* Code below shows what we mention above in point 3 - apply some feature engineering
 
 ```{r}
-# figure out the existing of threshold which cause the outcome = 0
+# figure out the existing threshold which cause the outcome = 0
 # we calculate the number of rows which satisfy both of the conditions: (X >= or <= "threshold") and (outcome = 0)
-# we divide above result by number of rows that outcome = 0
+# we divide above result by the number of rows that lead the outcome = 0
 # we get the percentage of how that predictor influence the outcome
 
 x19_p <- nrow(filter(df, (df$X19 >= 50) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
@@ -153,6 +153,16 @@ df_x_1 <- df_x %>%
 # And we get our preprocessed x data
 ```
 
+# preprocess 2, log method: apply log(x +10) on X1, X11, X12, X13, X14 to remove the right-skewed
+# + 10 here is to get rid of the error when the original value is 0
+
+```{r}
+df_x_1$X1 <- log(df_x_1$X1 + 10)
+df_x_1$X11 <- log(df_x_1$X11 + 10)
+df_x_1$X12 <- log(df_x_1$X12 + 10)
+df_x_1$X13 <- log(df_x_1$X13 + 10)
+df_x_1$X14 <- log(df_x_1$X14 + 10)
+```
 
 ## CV
 
@@ -221,6 +231,39 @@ rfTune_test2 <- train(x = df_x_1, y = df_y,
                 importance = TRUE,
                 trControl = ctrl2)
 ```
+
+
+
+# Regression tree
+```{r}
+set.seed(1)
+cartTune <- train(x = df_x_1, y = df_y,
+method = "rpart",
+tuneLength = 15,
+trControl = ctrl)
+plot(cartTune)
+```
+
+
+
+# MARS
+```{r}
+set.seed(1)
+marsGrid <- expand.grid(degree = 1:4, nprune = c(10, 20, 30, 40))
+marsTune <- train(df_x_1, df_y,
+method = "earth",
+tuneGrid = marsGrid,
+preProcess = c("center", "scale"),
+trControl = ctrl
+)
+ggplot(marsTune)+
+theme_classic()
+```
+
+
+
+
+
 
 ```{r}
 # Plot the result and comparison
