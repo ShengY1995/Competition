@@ -1,0 +1,348 @@
+---
+title: "Competition-2"
+author: "Sheng-Yu Wei"
+date: "3/16/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(tidyr)
+library(ggpubr)
+library(caret)
+library(ggplot2)
+library(lattice)
+library(skimr)
+```
+## Input training data
+```{r}
+# Input the competition-data.csv to train our model
+df <- read.csv("competition-data.csv")
+```
+
+```{r}
+# Separate the predictors (df_x) and outcome (df_y)
+df_x <- df %>%
+  select(-outcome)
+
+df_y <- df$outcome
+```
+
+
+## Explore the dataset
+
+```{r}
+# Distribution of the outcome
+ggplot(df, aes(x = outcome)) +
+  geom_histogram(bins = 10, color="black", fill="grey")
+```
+
+```{r}
+skim(df)
+```
+
+```{r}
+# Make a correlation plot
+corrplot::corrplot(cor(df))
+```
+
+
+## All variables histogram
+```{r}
+df_x %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(bins = 20)
+df_x %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_boxplot(outlier.shape = NA)
+```
+
+## feature plot
+
+```{r}
+feature_plot_df <- df_x_1 %>%
+  mutate(outcome = df$outcome) %>%
+  pivot_longer(cols=colnames(df_x_1))
+```
+```{r}
+feature_plots <- ggplot(feature_plot_df, aes(x=value, y=outcome)) + 
+  geom_point(alpha=0.3, size=0.4) + 
+  geom_smooth(method='lm', size=0.4, se = F)+
+  facet_wrap( ~ name, scales="free") +
+  labs(y = "Response of defaulting")+
+  theme(text = element_text(size = 8))
+feature_plots
+```
+
+
+
+## Some interesting finds
+
+1. The outcome is between 0 to 100, but all the values are integer -> Is it possible that these values are "categorical" instead of numeric?
+2. Most of the predictors contain tremendous 0 value (X11, X12, X13 ...), it doesn't seem like a normal "skewed" issue -> I suggest it must be some errors or manual adjustment (normally, distribution will not be that extreme)
+3. X19, X20, X21  directly influences the outcome -> A "threshold" exists (we will talk about this later), each variables beyond or under this threshold will lead outcome to a 0 (as image below).
+
+```{r fig.width=15, fig.height=4}
+# Threshold for X19
+ggplot(df, aes(x = X19, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 50, color = "blue") +
+  annotate(geom="text", x=150, y=50, label="X19 = 50",
+              color="blue")+
+  theme_classic()
+
+# Threshold for X20
+ggplot(df, aes(x = X20, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 100, color = "blue") +
+  annotate(geom="text", x=550, y=25, label="X20 = 100",
+              color="blue")+
+  theme_classic()
+
+# Threshold for X21
+ggplot(df, aes(x = X21, y = outcome)) +
+  geom_point()+
+  geom_vline(xintercept = 50000, color = "blue") +
+  annotate(geom="text", x=180000, y=25, label="X21 = 50000",
+              color="blue")+
+  theme_classic()
+```
+
+
+## Preprocess (feature engineering)
+
+* Code below shows what we mention above in point 3 - apply some feature engineering
+
+```{r}
+# figure out the existing threshold which cause the outcome = 0
+# we calculate the number of rows which satisfy both of the conditions: (X >= or <= "threshold") and (outcome = 0)
+# we divide above result by the number of rows that lead the outcome = 0
+# we get the percentage of how that predictor influence the outcome
+
+x19_p <- nrow(filter(df, (df$X19 >= 50) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+x20_p <- nrow(filter(df, (df$X20 <= 100) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+x21_p <- nrow(filter(df, (df$X21 <= 1000) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+c(x19_p,x20_p,x21_p)
+```
+* The result shows that 3 predictors lead to 100% of the 0 outcome
+
+* Base on the above statement, we `mutate` 3 categorical-like predictors to our df_x
+
+
+```{r}
+# preprocess 1 (adding additional X19_2, X20_2, X21_2 as "categorical" variables, which 0 represents smaller than threshold, and 1 represents larger)
+df_x_1 <- df_x %>%
+  mutate(X19_2 = ifelse(df_x$X19 < 50, 0, 1), 
+         X20_2 = ifelse(df_x$X20 < 100, 0, 1), 
+         X21_2 = ifelse(df_x$X21 < 1000, 0, 1),
+         # 3/22 Adding 2 sum up predictors, in order to reduce the noise caused by a single indicator
+         Xadd1 = df_x$X1 + df_x$X11 + df_x$X12 + df_x$X13,
+         Xadd2 = df_x$X3 + df_x$X4 + df_x$X5)
+  
+# And we get our preprocessed x data
+```
+
+# preprocess 2, log method: apply log(x +10) on X1, X11, X12, X13, X14 to remove the right-skewed
+# + 10 here is to get rid of the error when the original value is 0
+
+```{r}
+df_x_1$X1 <- log(df_x_1$X1 + 10)
+df_x_1$X11 <- log(df_x_1$X11 + 10)
+df_x_1$X12 <- log(df_x_1$X12 + 10)
+df_x_1$X13 <- log(df_x_1$X13 + 10)
+df_x_1$X14 <- log(df_x_1$X14 + 10)
+```
+
+## CV
+
+**Set up cross validation**
+```{r}
+# Use fold = 4 in order to estimate the real generalization RMSE (since we use 6k training data to predict 2k test-x-values = 3:1)
+set.seed(1)
+folds <- createFolds(df_new_y, k = 4, returnTrain = TRUE)
+ctrl <- trainControl(method = "cv", index = folds)
+```
+
+```{r}
+# Use fold = 10 in order to estimate the ideal generalization RMSE (we probably might not get this good)
+set.seed(1)
+folds2 <- createFolds(df_new_y, k = 10, returnTrain = TRUE)
+ctrl2 <- trainControl(method = "cv", index = folds2)
+```
+
+# Model training
+
+## Regression Tree
+
+```{r}
+set.seed(1)
+cartTune <- train(x = df_x_1, y = df_y,
+                  method = "rpart",
+                  tuneLength = 15,
+                  trControl = ctrl2)
+cartTune$results
+plot(cartTune)
+```
+
+## Random forests
+
+```{r}
+mtryGrid <- data.frame(
+  mtry = floor(seq(10, 20, length = 11))
+  )
+```
+
+```{r}
+set.seed(1)
+# Comparison group : No preprocess applied
+rfTune_comp <- train(x = df_x, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                importance = TRUE,
+                trControl = ctrl)
+
+# Test group1 : Preprocess applied, cv fold = 4
+rfTune_test1 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl)
+
+# Test group2 : Preprocess applied, cv fold = 10
+rfTune_test2 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl2)
+```
+
+
+
+# Regression tree
+```{r}
+set.seed(1)
+cartTune <- train(x = df_x_1, y = df_y,
+method = "rpart",
+tuneLength = 15,
+trControl = ctrl)
+plot(cartTune)
+```
+
+
+
+# MARS
+```{r}
+set.seed(1)
+marsGrid <- expand.grid(degree = 1:4, nprune = c(10, 20, 30, 40))
+marsTune <- train(df_x_1, df_y,
+method = "earth",
+tuneGrid = marsGrid,
+preProcess = c("center", "scale"),
+trControl = ctrl
+)
+ggplot(marsTune)+
+theme_classic()
+```
+
+
+
+
+
+
+```{r}
+# Plot the result and comparison
+ggplot(rfTune_comp, aes(x = mtry, y = RMSE)) +
+  geom_point(data = rfTune_test1$results)+
+  geom_line(data = rfTune_test1$results, color = "blue")+
+  geom_point(data = rfTune_test2$results)+
+  geom_line(data = rfTune_test2$results, color = "green")+
+  annotate(geom="text", x=15, y=2.5, label="test1",
+              color="blue")+
+  annotate(geom="text", x=15, y=2.475, label="test2",
+              color="green")+
+  annotate(geom="text", x=15, y=2.54, label="comparison")+
+  theme_classic()
+
+# The best tune of each model (estimate generalization error)
+comp_table <- rbind(filter(rfTune_comp$results, RMSE == min(RMSE)),
+                         filter(rfTune_test1$results, RMSE == min(RMSE)),
+                         filter(rfTune_test2$results, RMSE == min(RMSE)))
+
+comp_table
+```
+
+
+### Feature importance ranking
+
+```{r}
+# Feature importance estimate
+g1 <- ggplot(varImp(rfTune_comp)) +
+  theme_classic()
+g2 <- ggplot(varImp(rfTune_test1)) +
+  theme_classic()
+g3 <- ggplot(varImp(rfTune_test2)) +
+  theme_classic()
+ggarrange(g1, g2, g3, ncol = 3)
+```
+
+# Output the prediction as CSV format 
+
+```{r}
+# Output a csv file with our prediction
+df_test <- read.csv("competition-test-x-values.csv") %>%
+  mutate(X19_2 = ifelse(df_test$X19 < 50, 0, 1), 
+         X20_2 = ifelse(df_test$X20 < 100, 0, 1), 
+         X21_2 = ifelse(df_test$X21 < 1000, 0, 1),
+         Xadd1 = df_test$X1 + df_test$X11 + df_test$X12 + df_test$X13,
+         Xadd2 = df_test$X3 + df_test$X4 + df_test$X5)
+
+result <- as.data.frame(predict(rfTune_test2, df_test))
+
+write.table(result,
+            file = "competition-test-outcome.csv",
+            row.names = FALSE,
+            col.names = "outcome")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
