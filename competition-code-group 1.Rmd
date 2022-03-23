@@ -259,10 +259,9 @@ comp_table
 ```
 
 ```{r}
+# Take a look of overfitting issue
 RMSE(predict(rfTune_test1, df_x_1), df_y)
 ```
-
-
 
 ### Feature importance ranking
 
@@ -308,10 +307,10 @@ result <- as.data.frame(predict(rfTune_test2, df_test))
 
 write.table(result,
             file = "competition-test-outcome.csv",
+            sep = ",",
             row.names = FALSE,
             col.names = "outcome")
 ```
-
 
 
 
