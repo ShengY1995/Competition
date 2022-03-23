@@ -12,7 +12,7 @@ This project is a collaborated competition based on the dataset from [PittDataSc
 
 ## Brief summary for the files
 
-* [comption-data.csv](https://github.com/clewandowski9/Competition/blob/main/competition-data.csv) : Trianing dataset which is provided by professor Hinder
+* [competion-data.csv](https://github.com/clewandowski9/Competition/blob/main/competition-data.csv) : Trianing dataset which is provided by professor Hinder
 * [competition-test-x-values.csv](https://github.com/clewandowski9/Competition/blob/main/competition-test-x-values.csv) : Test dataset without outcome, our target is predicting the outcome via our model
 * [competition-code-group 1.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-code-group%201.Rmd) : The code of model training which includes following content
   + Data exploration
@@ -20,7 +20,7 @@ This project is a collaborated competition based on the dataset from [PittDataSc
   + Multi model fitting and training
   + Error evaluating for each model
   + Prediction of unseen data (competition-test-x-values) generating
-* [competition-model-accuracy-verification.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-model-accuracy-verification.Rmd) : In order to make sure the model will work well, we separated comption-data.csv into training and test set, then we can estimate what RMSE we may get if we applied the model on unseen data.
+* [competition-model-accuracy-verification.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-model-accuracy-verification.Rmd) : In order to make sure the model will work well, we separated **competion-data.csv** into training and test set, then we can estimate what RMSE we may get if we applied the model on unseen data.
 * [competition-test-outcome.csv](https://github.com/clewandowski9/Competition/blob/main/competition-test-outcome.csv) : Final prediction of outcome (1 column dataframe)
 
 
