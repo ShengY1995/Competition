@@ -14,7 +14,7 @@ This project is a collaborated competition based on the dataset from [PittDataSc
 
 * [comption-data.csv](https://github.com/clewandowski9/Competition/blob/main/competition-data.csv) : Trianing dataset which is provided by professor Hinder
 * [competition-test-x-values.csv](https://github.com/clewandowski9/Competition/blob/main/competition-test-x-values.csv) : Test dataset without outcome, our target is predicting the outcome via our model
-* [competition-group 1.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-group%201.Rmd) : The code of model training which includes following content
+* [competition-code-group 1.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-code-group%201.Rmd) : The code of model training which includes following content
   + Data exploration
   + Data preprocessing (feature engineering)
   + Multi model fitting and training
