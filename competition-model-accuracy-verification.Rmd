@@ -1,0 +1,134 @@
+---
+title: "Competition-test-varification"
+author: "Sheng-Yu Wei"
+date: "3/16/2022"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(tidyr)
+library(caret)
+library(ggplot2)
+```
+> In this Rmd, we look forward to estimate that our preprocessing method and model choosing is effective or not. We simply separate our competition-data.csv into training (5000 obs.) and test (1000 obs.) set. In other words, we check the result after we applying our prediction model (trained by training set) on test set. This process can guarantee the unseen data (competition-test-x-values.csv) perform as well as we our estimation.
+
+## Input training data
+```{r}
+# Input the competition-data.csv to train our model
+df <- read.csv("competition-data.csv")
+```
+
+```{r}
+# Separate the competition-data.csv into training and test set randomly
+set.seed(1)
+mini_df <- slice_sample(df, n=6000)
+training_set <- slice_head(mini_df, n=5000)
+test_set <- slice_tail(mini_df, n=1000)
+
+# Separate the predictors (df_x) and outcome (df_y)
+df_x <- training_set %>%
+  select(-outcome)
+
+df_y <- training_set$outcome
+```
+
+
+## Preprocess (feature engineering)
+
+```{r}
+# preprocess 1 (adding additional X19_2, X20_2, X21_2 as "categorical" variables, which 0 represents smaller than threshold, and 1 represents larger)
+df_x_1 <- df_x %>%
+  mutate(X19_2 = ifelse(df_x$X19 < 50, 0, 1), 
+         X20_2 = ifelse(df_x$X20 < 100, 0, 1), 
+         X21_2 = ifelse(df_x$X21 < 1000, 0, 1),
+         Xadd1 = df_x$X1 + df_x$X11 + df_x$X12 + df_x$X13,
+         Xadd2 = df_x$X3 + df_x$X4 + df_x$X5)
+# and we get our preprocessed x data
+```
+
+## CV
+
+**Set up cross validation**
+```{r}
+# Use fold = 4 in order to estimate the real generalization RMSE (since we use 6k training data to predict 2k test-x-values = 3:1)
+set.seed(1)
+folds <- createFolds(df_y, k = 5, returnTrain = TRUE)
+ctrl <- trainControl(method = "cv", index = folds)
+```
+
+```{r}
+# Use fold = 10 in order to estimate the ideal generalization RMSE (we probably might not get this good)
+set.seed(1)
+folds2 <- createFolds(df_y, k = 10, returnTrain = TRUE)
+ctrl2 <- trainControl(method = "cv", index = folds2)
+```
+
+# Model training
+
+## Random forests (We only use this, since its perfomance is the best)
+
+```{r}
+mtryGrid <- data.frame(
+  mtry = floor(seq(10, 20, length = 11))
+  )
+```
+
+```{r}
+set.seed(1)
+
+# Test group1 : Preprocess applied, cv fold = 4
+rfTune_test1 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl)
+
+# Test group2 : Preprocess applied, cv fold = 10
+rfTune_test2 <- train(x = df_x_1, y = df_y,
+                method = "rf",
+                tuneGrid = mtryGrid,
+                ntree = 100,
+                preProcess = c("center", "scale"),
+                importance = TRUE,
+                trControl = ctrl2)
+```
+
+```{r}
+plot(rfTune_test1)
+plot(rfTune_test2)
+```
+```{r}
+df_test_x <- test_set %>%
+  select(-outcome) %>%
+  mutate(X19_2 = ifelse(test_set$X19 < 50, 0, 1), 
+         X20_2 = ifelse(test_set$X20 < 100, 0, 1), 
+         X21_2 = ifelse(test_set$X21 < 1000, 0, 1),
+         Xadd1 = test_set$X1 + test_set$X11 + test_set$X12 + test_set$X13,
+         Xadd2 = test_set$X3 + test_set$X4 + test_set$X5)
+
+
+RMSE(predict(rfTune_test1, df_test_x), test_set$outcome)
+RMSE(predict(rfTune_test2, df_test_x), test_set$outcome)
+```
+
+> The result says that we made a really nice model to reach the 2.5 threshold!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
