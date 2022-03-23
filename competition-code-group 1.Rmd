@@ -19,6 +19,7 @@ library(ggplot2)
 library(lattice)
 library(skimr)
 ```
+
 ## Input training data
 ```{r}
 # Input the competition-data.csv to train our model
@@ -71,9 +72,9 @@ df_x %>%
 ## feature plot
 
 ```{r}
-feature_plot_df <- df_x_1 %>%
+feature_plot_df <- df_x %>%
   mutate(outcome = df$outcome) %>%
-  pivot_longer(cols=colnames(df_x_1))
+  pivot_longer(cols=colnames(df_x))
 ```
 ```{r}
 feature_plots <- ggplot(feature_plot_df, aes(x=value, y=outcome)) + 
@@ -133,6 +134,7 @@ ggplot(df, aes(x = X21, y = outcome)) +
 x19_p <- nrow(filter(df, (df$X19 >= 50) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
 x20_p <- nrow(filter(df, (df$X20 <= 100) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
 x21_p <- nrow(filter(df, (df$X21 <= 1000) & (df$outcome == 0))) / nrow(filter(df, df$outcome == 0))
+
 c(x19_p,x20_p,x21_p)
 ```
 * The result shows that 3 predictors lead to 100% of the 0 outcome
@@ -146,8 +148,8 @@ df_x_1 <- df_x %>%
   mutate(X19_2 = ifelse(df_x$X19 < 50, 0, 1), 
          X20_2 = ifelse(df_x$X20 < 100, 0, 1), 
          X21_2 = ifelse(df_x$X21 < 1000, 0, 1),
-         # 3/22 Adding 2 sum up predictors, in order to reduce the noise caused by a single indicator
-         Xadd1 = df_x$X1 + df_x$X11 + df_x$X12 + df_x$X13,
+# 3/22 Adding 2 sum up predictors, in order to reduce the noise caused by a single indicator
+         Xadd1 = df_x$X1 + df_x$X11 + df_x$X12 + df_x$X13, 
          Xadd2 = df_x$X3 + df_x$X4 + df_x$X5)
   
 # And we get our preprocessed x data
@@ -156,7 +158,8 @@ df_x_1 <- df_x %>%
 # preprocess 2, log method: apply log(x +10) on X1, X11, X12, X13, X14 to remove the right-skewed
 # + 10 here is to get rid of the error when the original value is 0
 
-```{r}
+```
+# 3/22 : This feature engineering doesn't work well
 df_x_1$X1 <- log(df_x_1$X1 + 10)
 df_x_1$X11 <- log(df_x_1$X11 + 10)
 df_x_1$X12 <- log(df_x_1$X12 + 10)
@@ -168,16 +171,16 @@ df_x_1$X14 <- log(df_x_1$X14 + 10)
 
 **Set up cross validation**
 ```{r}
-# Use fold = 4 in order to estimate the real generalization RMSE (since we use 6k training data to predict 2k test-x-values = 3:1)
+# Use fold = 5 in order to estimate the real generalization RMSE
 set.seed(1)
-folds <- createFolds(df_new_y, k = 4, returnTrain = TRUE)
+folds <- createFolds(df_y, k = 5, returnTrain = TRUE)
 ctrl <- trainControl(method = "cv", index = folds)
 ```
 
 ```{r}
 # Use fold = 10 in order to estimate the ideal generalization RMSE (we probably might not get this good)
 set.seed(1)
-folds2 <- createFolds(df_new_y, k = 10, returnTrain = TRUE)
+folds2 <- createFolds(df_y, k = 10, returnTrain = TRUE)
 ctrl2 <- trainControl(method = "cv", index = folds2)
 ```
 
@@ -189,7 +192,7 @@ ctrl2 <- trainControl(method = "cv", index = folds2)
 set.seed(1)
 cartTune <- train(x = df_x_1, y = df_y,
                   method = "rpart",
-                  tuneLength = 15,
+                  tuneLength = 20,
                   trControl = ctrl2)
 cartTune$results
 plot(cartTune)
@@ -204,7 +207,7 @@ mtryGrid <- data.frame(
 ```
 
 ```{r}
-set.seed(1)
+set.seed(2)
 # Comparison group : No preprocess applied
 rfTune_comp <- train(x = df_x, y = df_y,
                 method = "rf",
@@ -233,38 +236,6 @@ rfTune_test2 <- train(x = df_x_1, y = df_y,
 ```
 
 
-
-# Regression tree
-```{r}
-set.seed(1)
-cartTune <- train(x = df_x_1, y = df_y,
-method = "rpart",
-tuneLength = 15,
-trControl = ctrl)
-plot(cartTune)
-```
-
-
-
-# MARS
-```{r}
-set.seed(1)
-marsGrid <- expand.grid(degree = 1:4, nprune = c(10, 20, 30, 40))
-marsTune <- train(df_x_1, df_y,
-method = "earth",
-tuneGrid = marsGrid,
-preProcess = c("center", "scale"),
-trControl = ctrl
-)
-ggplot(marsTune)+
-theme_classic()
-```
-
-
-
-
-
-
 ```{r}
 # Plot the result and comparison
 ggplot(rfTune_comp, aes(x = mtry, y = RMSE)) +
@@ -272,11 +243,11 @@ ggplot(rfTune_comp, aes(x = mtry, y = RMSE)) +
   geom_line(data = rfTune_test1$results, color = "blue")+
   geom_point(data = rfTune_test2$results)+
   geom_line(data = rfTune_test2$results, color = "green")+
-  annotate(geom="text", x=15, y=2.5, label="test1",
+  annotate(geom="text", x=15, y=2.465, label="test1",
               color="blue")+
-  annotate(geom="text", x=15, y=2.475, label="test2",
+  annotate(geom="text", x=15, y=2.445, label="test2",
               color="green")+
-  annotate(geom="text", x=15, y=2.54, label="comparison")+
+  annotate(geom="text", x=15, y=2.52, label="comparison")+
   theme_classic()
 
 # The best tune of each model (estimate generalization error)
@@ -286,6 +257,11 @@ comp_table <- rbind(filter(rfTune_comp$results, RMSE == min(RMSE)),
 
 comp_table
 ```
+
+```{r}
+RMSE(predict(rfTune_test1, df_x_1), df_y)
+```
+
 
 
 ### Feature importance ranking
@@ -301,17 +277,33 @@ g3 <- ggplot(varImp(rfTune_test2)) +
 ggarrange(g1, g2, g3, ncol = 3)
 ```
 
+## MARS
+```{r}
+set.seed(1)
+marsGrid <- expand.grid(degree = 1:3, nprune = c(10, 20, 30, 40))
+marsTune <- train(df_x_1, df_y,
+method = "earth",
+tuneGrid = marsGrid,
+preProcess = c("center", "scale"),
+trControl = ctrl2
+)
+ggplot(marsTune)+
+theme_classic()
+```
+
 # Output the prediction as CSV format 
 
 ```{r}
 # Output a csv file with our prediction
 df_test <- read.csv("competition-test-x-values.csv") %>%
+  # Apply the same preprocess method to test-x
   mutate(X19_2 = ifelse(df_test$X19 < 50, 0, 1), 
          X20_2 = ifelse(df_test$X20 < 100, 0, 1), 
          X21_2 = ifelse(df_test$X21 < 1000, 0, 1),
          Xadd1 = df_test$X1 + df_test$X11 + df_test$X12 + df_test$X13,
          Xadd2 = df_test$X3 + df_test$X4 + df_test$X5)
 
+# We use rfTune_test2 for the best prediction result
 result <- as.data.frame(predict(rfTune_test2, df_test))
 
 write.table(result,
