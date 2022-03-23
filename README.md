@@ -20,6 +20,7 @@ This project is a collaborated competition based on the dataset from [PittDataSc
   + Multi model fitting and training
   + Error evaluating for each model
   + Prediction of unseen data (competition-test-x-values) generating
+* [competition-model-accuracy-verification.Rmd](https://github.com/clewandowski9/Competition/blob/main/competition-model-accuracy-verification.Rmd) : In order to make sure the model will work well, we separated comption-data.csv into training and test set, then we can estimate what RMSE we may get if we applied the model on unseen data.
 * [competition-test-outcome.csv](https://github.com/clewandowski9/Competition/blob/main/competition-test-outcome.csv) : Final prediction of outcome (1 column dataframe)
 
 
